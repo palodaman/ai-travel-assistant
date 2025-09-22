@@ -18,10 +18,14 @@ genai.configure(api_key=GOOGLE_API_KEY)
 FUNCTIONS = [
     {
         "name": "weather_tool",
-        "description": "Get current weather for a city",
+        "description": "Get current weather for a city. Optionally specify state/province and country for disambiguation (e.g., Victoria, BC, Canada vs Victoria, Australia)",
         "parameters": {
             "type": "object",
-            "properties": {"city": {"type": "string"}},
+            "properties": {
+                "city": {"type": "string", "description": "City name"},
+                "state": {"type": "string", "description": "Optional state or province name"},
+                "country": {"type": "string", "description": "Optional country name"}
+            },
             "required": ["city"],
         },
     },
@@ -69,7 +73,11 @@ def run_agent(message: str, history: list[Dict[str, Any]]):
             args = dict(call.args)
 
             if name == "weather_tool":
-                out = get_weather(args["city"])
+                out = get_weather(
+                    args["city"],
+                    state=args.get("state"),
+                    country=args.get("country")
+                )
             elif name == "currency_convert":
                 out = convert(args["amount"], args["from"], args["to"])
             else:
@@ -120,7 +128,11 @@ def run_agent_stream(message: str, history: list[Dict[str, Any]]):
                 yield {"type": "tool_start", "name": name, "args": args}
 
                 if name == "weather_tool":
-                    out = get_weather(args["city"])
+                    out = get_weather(
+                        args["city"],
+                        state=args.get("state"),
+                        country=args.get("country")
+                    )
                 elif name == "currency_convert":
                     out = convert(args["amount"], args["from"], args["to"])
                 else:

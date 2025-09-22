@@ -2,3 +2,5 @@
 .env
 journey.txt
 backend/.venv/
+__pycache__/
+*.pyc

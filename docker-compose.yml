@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  backend:
+    build: ./backend
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: gemini-1.5-flash
+      FRONTEND_ORIGIN: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8000:8000"]
+    depends_on: [redis]
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [backend]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]

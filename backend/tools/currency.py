@@ -1,26 +1,42 @@
 import requests
-from cache import cache_get, cache_set, key_for
-
 
 def convert(amount: float, src: str, dst: str):
     src, dst = src.upper(), dst.upper()
-    k = key_for("fx", {"amount": amount, "src": src, "dst": dst})
-    if cached := cache_get(k):
-        import json
 
-        return json.loads(cached)
+    #using exchangerate-api.com v4(free, no API key needed)
+    try:
+        r = requests.get(
+            f"https://api.exchangerate-api.com/v4/latest/{src}",
+            timeout=10,
+        ).json()
 
-    r = requests.get(
-        "https://api.exchangerate.host/convert",
-        params={"from": src, "to": dst, "amount": amount},
-        timeout=10,
-    ).json()
-    out = {
-        "amount": amount,
-        "from": src,
-        "to": dst,
-        "result": r.get("result"),
-        "date": r.get("date"),
-    }
-    cache_set(k, out, ttl=300)
+        if "rates" in r and dst in r["rates"]:
+            rate = r["rates"][dst]
+            result = amount * rate
+            out = {
+                "amount": amount,
+                "from": src,
+                "to": dst,
+                "result": round(result, 2),
+                "date": r.get("date"),
+            }
+        else:
+            out = {
+                "amount": amount,
+                "from": src,
+                "to": dst,
+                "result": None,
+                "date": None,
+                "error": f"Unable to convert {src} to {dst}"
+            }
+    except Exception as e:
+        out = {
+            "amount": amount,
+            "from": src,
+            "to": dst,
+            "result": None,
+            "date": None,
+            "error": str(e)
+        }
+
     return out

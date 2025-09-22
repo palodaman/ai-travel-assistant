@@ -1,9 +1,11 @@
+import os 
 import structlog
 from flask import Flask, request, jsonify
 from security import harden
 from schemas import WeatherInput, ConvertInput
 from tools.weather import get_weather
 from tools.currency import convert
+from gemini_agent import run_agent
 
 log = structlog.get_logger()
 app = harden(Flask(__name__))
@@ -14,7 +16,7 @@ def health():
     return {"ok": True}
 
 
-# Plain tool endpoints (callable directly)
+# Plain tool endpoints (callable directly or by Gemini)
 @app.post("/tools/weather")
 def weather_ep():
     data = request.get_json(force=True, silent=True) or {}
@@ -37,5 +39,18 @@ def convert_ep():
     return jsonify(out)
 
 
+# Chat endpoint for the frontend
+@app.post("/chat")
+def chat():
+    body = request.get_json(force=True) or {}
+    msg = body.get("message", "")
+    history = body.get("history", [])
+    if not msg:
+        return {"error": "message is required"}, 400
+    text, traces = run_agent(msg, history)
+    log.info("chat_completion", message=msg, traces=traces)
+    return jsonify({"text": text, "traces": traces})
+
+
 if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

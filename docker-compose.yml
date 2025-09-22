@@ -4,17 +4,26 @@ services:
     build: ./backend
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: gemini-1.5-flash
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      EXCHANGERATE_API_KEY: ${EXCHANGERATE_API_KEY}
       FRONTEND_ORIGIN: http://localhost:3000
+      PORT: 5001
       REDIS_URL: redis://redis:6379/0
-    ports: ["8000:8000"]
+    ports: ["5001:5001"]
     depends_on: [redis]
+    volumes:
+      - ./backend:/app
+    command: python app.py
   frontend:
     build: ./frontend
     environment:
-      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:5001
     ports: ["3000:3000"]
     depends_on: [backend]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]

@@ -5,11 +5,7 @@ from flask_limiter.util import get_remote_address
 
 
 def harden(app: Flask):
-    # CORS: allow only your frontend origin via env FRONTEND_ORIGIN
-    import os
-
-    origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
-    CORS(app, resources={r"/*": {"origins": [origin]}})
+    # CORS is now handled in app.py
     # Rate limit
     Limiter(get_remote_address, app=app, default_limits=["60/minute", "1000/day"])
 

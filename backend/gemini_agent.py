@@ -91,3 +91,79 @@ def run_agent(message: str, history: list[Dict[str, Any]]):
 
     final_text = resp.text or "No response."
     return final_text, tool_traces
+
+
+def run_agent_stream(message: str, history: list[Dict[str, Any]]):
+    """Stream version of run_agent that yields chunks of text"""
+    try:
+        chat = model.start_chat(history=history or [])
+
+        # Send initial message without streaming to check for tool calls
+        initial_resp = chat.send_message(message)
+
+        tool_traces = []
+        calls = []
+
+        # Check if there are function calls
+        for part in initial_resp.candidates[0].content.parts:
+            if fn := getattr(part, "function_call", None):
+                calls.append(fn)
+
+        # If there are tool calls, process them
+        if calls:
+            tool_msgs = []
+            for call in calls:
+                name = call.name
+                args = dict(call.args)
+
+                # Notify frontend about tool usage
+                yield {"type": "tool_start", "name": name, "args": args}
+
+                if name == "weather_tool":
+                    out = get_weather(args["city"])
+                elif name == "currency_convert":
+                    out = convert(args["amount"], args["from"], args["to"])
+                else:
+                    out = {"error": f"Unknown tool {name}"}
+
+                tool_traces.append({"name": name, "args": args, "result": out})
+                yield {"type": "tool_complete", "name": name, "result": out}
+
+                tool_msgs.append(
+                    genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=name,
+                            response={"content": out}
+                        )
+                    )
+                )
+
+            # Get final response after tool calls and stream it
+            import time
+            final_resp = chat.send_message(tool_msgs)
+            if final_resp.text:
+                words = final_resp.text.split(' ')
+                for i, word in enumerate(words):
+                    if i > 0:
+                        yield {"type": "text", "content": " "}
+                    yield {"type": "text", "content": word}
+                    time.sleep(0.005)  # Small delay between words for streaming effect
+        else:
+            # No tool calls, just stream the text
+            if initial_resp.text:
+                # Stream the text word by word for better effect
+                import time
+                text = initial_resp.text
+                words = text.split(' ')
+                for i, word in enumerate(words):
+                    if i > 0:
+                        yield {"type": "text", "content": " "}
+                    yield {"type": "text", "content": word}
+                    time.sleep(0.005)  # Small delay between words for streaming effect
+
+        # Send final traces if any
+        if tool_traces:
+            yield {"type": "traces", "traces": tool_traces}
+
+    except Exception as e:
+        yield {"type": "error", "content": str(e)}

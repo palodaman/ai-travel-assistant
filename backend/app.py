@@ -1,14 +1,20 @@
-import os 
+import os
+import json
 import structlog
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
+from flask_cors import CORS
 from security import harden
 from schemas import WeatherInput, ConvertInput
 from tools.weather import get_weather
 from tools.currency import convert
-from gemini_agent import run_agent
+from gemini_agent import run_agent, run_agent_stream
 
 log = structlog.get_logger()
-app = harden(Flask(__name__))
+app = Flask(__name__)
+
+# Apply CORS first, then other security hardening
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+app = harden(app)
 
 
 @app.get("/healthz")
@@ -39,7 +45,7 @@ def convert_ep():
     return jsonify(out)
 
 
-# Chat endpoint for the frontend
+# Chat endpoint with streaming
 @app.post("/chat")
 def chat():
     body = request.get_json(force=True) or {}
@@ -47,10 +53,27 @@ def chat():
     history = body.get("history", [])
     if not msg:
         return {"error": "message is required"}, 400
-    text, traces = run_agent(msg, history)
-    log.info("chat_completion", message=msg, traces=traces)
-    return jsonify({"text": text, "traces": traces})
+
+    def generate():
+        try:
+            for chunk in run_agent_stream(msg, history):
+                # Format as Server-Sent Event
+                yield f"data: {json.dumps(chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            log.error("stream_error", error=str(e))
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5001)), debug=True)

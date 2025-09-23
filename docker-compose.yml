@@ -9,6 +9,8 @@ services:
       FRONTEND_ORIGIN: http://localhost:3000
       PORT: 5001
       REDIS_URL: redis://redis:6379/0
+      GRPC_VERBOSITY: ERROR
+      GLOG_minloglevel: 2
     ports: ["5001:5001"]
     depends_on: [redis]
     volumes:

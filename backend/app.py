@@ -1,4 +1,9 @@
 import os
+
+# Suppress gRPC warnings before importing any Google libraries
+os.environ['GRPC_VERBOSITY'] = 'ERROR'
+os.environ['GLOG_minloglevel'] = '2'
+
 import json
 import structlog
 from flask import Flask, request, jsonify, Response, stream_with_context

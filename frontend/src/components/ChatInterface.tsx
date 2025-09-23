@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
   MapPin,
@@ -10,18 +10,28 @@ import {
   Globe,
   Loader2,
   TrendingUp,
-  Info
+  Info,
+  Brain,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import Lottie from "lottie-react";
 import planeAnimation from "../lottie/plane.json";
 import botAnimation from "../lottie/rpa.json";
 import userAnimation from "../lottie/user.json";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ToolTrace {
   name: string;
   args: Record<string, unknown>;
   result: Record<string, unknown>;
+}
+
+interface ThinkingStep {
+  tool: string;
+  reason: string;
+  params?: Record<string, unknown>;
 }
 
 interface Message {
@@ -31,6 +41,8 @@ interface Message {
   timestamp: Date;
   traces?: ToolTrace[];
   isStreaming?: boolean;
+  thinking?: ThinkingStep[];
+  isThinking?: boolean;
 }
 
 export default function ChatInterface() {
@@ -118,6 +130,7 @@ export default function ChatInterface() {
 
       let buffer = "";
       const traces: ToolTrace[] = [];
+      const thinkingSteps: ThinkingStep[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -135,11 +148,35 @@ export default function ChatInterface() {
             try {
               const parsed = JSON.parse(data);
 
-              if (parsed.type === "text") {
+              if (parsed.type === "thinking") {
+                // Handle thinking event
+                const step: ThinkingStep = {
+                  tool: parsed.tool,
+                  reason: parsed.reason,
+                  params: parsed.params
+                };
+                thinkingSteps.push(step);
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: msg.content + parsed.content }
+                      ? { ...msg, thinking: [...thinkingSteps], isThinking: true }
+                      : msg
+                  )
+                );
+              } else if (parsed.type === "thinking_complete") {
+                // Stop showing thinking animation
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, isThinking: false }
+                      : msg
+                  )
+                );
+              } else if (parsed.type === "text") {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: msg.content + parsed.content, isThinking: false }
                       : msg
                   )
                 );
@@ -159,7 +196,7 @@ export default function ChatInterface() {
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: `Error: ${parsed.content}`, isStreaming: false }
+                      ? { ...msg, content: `Error: ${parsed.content}`, isStreaming: false, isThinking: false }
                       : msg
                   )
                 );
@@ -305,7 +342,71 @@ export default function ChatInterface() {
                   ? "bg-indigo-600/20 border border-indigo-500/30 text-slate-100"
                   : "bg-slate-800/50 border border-slate-700/50 text-slate-200"
               )}>
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                {/* Thinking display */}
+                {message.thinking && message.thinking.length > 0 && (
+                  <div className="mb-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Brain className="w-4 h-4 text-indigo-400 animate-pulse" />
+                      <span className="text-xs text-indigo-400 font-medium">
+                        {message.isThinking ? "Thinking..." : "Thought Process"}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {message.thinking.map((step, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-slate-400">
+                          <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-slate-600" />
+                          <div>
+                            <span className="text-slate-300">
+                              {step.tool === "stop" ? "Finalizing response" :
+                               step.tool === "weather" ? "Checking weather" :
+                               step.tool === "currency" ? "Converting currency" :
+                               step.tool === "wikipedia" ? "Searching information" :
+                               `Using ${step.tool}`}
+                            </span>
+                            {step.reason && (
+                              <span className="ml-1 text-slate-500">- {step.reason}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                      strong: ({children}) => <strong className="font-semibold text-slate-100">{children}</strong>,
+                      em: ({children}) => <em className="italic">{children}</em>,
+                      ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-2 ml-4">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal list-inside mb-3 space-y-2 ml-4">{children}</ol>,
+                      li: ({children}) => (
+                        <li className="text-slate-200">
+                          <span>{children}</span>
+                        </li>
+                      ),
+                      code: ({className, children, ...props}) => {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return match ? (
+                          <pre className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/50 overflow-x-auto">
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          </pre>
+                        ) : (
+                          <code className="px-1 py-0.5 rounded bg-slate-800 text-indigo-300 text-xs" {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                      blockquote: ({children}) => <blockquote className="border-l-2 border-indigo-500 pl-3 italic">{children}</blockquote>,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
 
                 {message.isStreaming && (
                   <span className="inline-flex ml-2">

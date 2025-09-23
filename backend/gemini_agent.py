@@ -2,7 +2,7 @@ import os
 import google.generativeai as genai
 from typing import Dict, Any
 from dotenv import load_dotenv
-from agent_loop import run_agent_loop
+from agent_loop import AgentLoop
 
 # Suppress gRPC ALTS warning for local development
 os.environ['GRPC_VERBOSITY'] = 'ERROR'
@@ -127,7 +127,8 @@ def run_agent(message: str, history: list[Dict[str, Any]]):
         )
 
         # Step 1: Run the agent loop to gather context
-        agent_context = run_agent_loop(message, loop_model)
+        agent = AgentLoop(loop_model)
+        agent_context = agent.run(message)
 
         # Step 2: Use the main model to synthesize a final answer from the context
         chat = model.start_chat(history=history or [])
@@ -163,32 +164,57 @@ Be concise but informative."""
 def run_agent_stream(message: str, history: list[Dict[str, Any]]):
     """Stream version using the agent loop system with real Gemini streaming"""
     try:
+        import threading
+        import queue
+
         # Create a separate model instance for the agent loop
         loop_model = genai.GenerativeModel(
             model_name=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
             system_instruction="You are a tool orchestration agent. Analyze queries and decide which tools to call."
         )
 
-        # Notify frontend that we're gathering context
-        yield {"type": "text", "content": "Gathering information"}
-
-        # Step 1: Run the agent loop to gather context
-        agent_context = run_agent_loop(message, loop_model)
-
-        # Extract tool traces for frontend display
+        # Queue for thinking events
+        event_queue = queue.Queue()
+        agent_context = None
         tool_traces = []
-        if "Weather function was called" in agent_context:
-            tool_traces.append({"name": "weather_tool", "args": {}, "result": {}})
-            yield {"type": "tool_complete", "name": "weather_tool", "result": {}}
-        if "Currency function was called" in agent_context:
-            tool_traces.append({"name": "currency_convert", "args": {}, "result": {}})
-            yield {"type": "tool_complete", "name": "currency_convert", "result": {}}
-        if "Wikipedia function was called" in agent_context:
-            tool_traces.append({"name": "wikipedia_search", "args": {}, "result": {}})
-            yield {"type": "tool_complete", "name": "wikipedia_search", "result": {}}
 
-        # Clear the gathering message
-        yield {"type": "text", "content": "...\n\n"}
+        def thinking_callback(event):
+            """Callback to capture thinking events"""
+            event_queue.put(event)
+
+        def run_agent_thread():
+            """Run agent in a separate thread"""
+            nonlocal agent_context
+            agent = AgentLoop(loop_model)
+            agent_context = agent.run(message, thinking_callback)
+            event_queue.put({"type": "agent_done"})
+
+        # Start agent in background thread
+        thread = threading.Thread(target=run_agent_thread)
+        thread.start()
+
+        # Stream thinking events as they come in
+        while True:
+            try:
+                event = event_queue.get(timeout=0.1)
+                if event.get("type") == "agent_done":
+                    break
+                yield event
+
+                # Track tool usage for final summary
+                if event.get("type") == "thinking" and event.get("tool"):
+                    tool_name = event.get("tool")
+                    if tool_name == "weather":
+                        tool_traces.append({"name": "weather_tool", "args": {}, "result": {}})
+                    elif tool_name == "currency":
+                        tool_traces.append({"name": "currency_convert", "args": {}, "result": {}})
+                    elif tool_name == "wikipedia":
+                        tool_traces.append({"name": "wikipedia_search", "args": {}, "result": {}})
+            except queue.Empty:
+                continue
+
+        # Wait for agent thread to complete
+        thread.join(timeout=30)
 
         # Step 2: Stream the synthesized response
         chat = model.start_chat(history=history or [])

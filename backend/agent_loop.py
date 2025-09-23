@@ -170,10 +170,14 @@ Return ONLY valid JSON for the next tool call. No other text."""
             logger.error(f"Error executing tool {tool_name}: {e}")
             return f"\n+ Error executing {tool_name} at {timestamp}: {str(e)}\n"
 
-    def run(self, user_query: str) -> str:
+    def run(self, user_query: str, thinking_callback=None) -> str:
         """
         Main agent loop that orchestrates tool calls and builds context.
         Returns the accumulated OUTPUT string without synthesis.
+
+        Args:
+            user_query: The user's query
+            thinking_callback: Optional callback to emit thinking events
         """
         # Initialize OUTPUT with the original query
         self.output_context = f"Original user query was: {user_query}\n"
@@ -187,9 +191,24 @@ Return ONLY valid JSON for the next tool call. No other text."""
             # Step 1: Choose which tool to call next
             tool_decision = self.choose_tool_result(user_query, self.output_context)
 
+            # Emit thinking event if callback provided
+            if thinking_callback and tool_decision:
+                thinking_callback({
+                    "type": "thinking",
+                    "iteration": self.iteration_count,
+                    "tool": tool_decision.get("tool"),
+                    "reason": tool_decision.get("reason", "Analyzing query..."),
+                    "params": {k: v for k, v in tool_decision.items() if k not in ["tool", "reason", "stop"]}
+                })
+
             # Step 2: Check for stop condition
             if tool_decision.get("tool") == "stop":
                 logger.info("Stop tool called, ending loop")
+                if thinking_callback:
+                    thinking_callback({
+                        "type": "thinking_complete",
+                        "message": "Finished gathering information"
+                    })
                 break
 
             # Step 3: Execute the tool
@@ -218,10 +237,15 @@ def create_agent_loop(model: genai.GenerativeModel) -> AgentLoop:
 
 
 # Standalone function for easy integration
-def run_agent_loop(user_query: str, model: genai.GenerativeModel) -> str:
+def run_agent_loop(user_query: str, model: genai.GenerativeModel, thinking_callback=None) -> str:
     """
     Convenience function to run the agent loop.
     Returns accumulated context string without synthesis.
+
+    Args:
+        user_query: The user's query
+        model: The Gemini model to use
+        thinking_callback: Optional callback to emit thinking events
     """
     agent = AgentLoop(model)
-    return agent.run(user_query)
+    return agent.run(user_query, thinking_callback)

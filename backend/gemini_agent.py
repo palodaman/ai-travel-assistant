@@ -102,11 +102,11 @@ def run_agent(message: str, history: list[Dict[str, Any]]):
 
 
 def run_agent_stream(message: str, history: list[Dict[str, Any]]):
-    """Stream version of run_agent that yields chunks of text"""
+    """Stream version of run_agent that yields chunks of text using real Gemini streaming"""
     try:
         chat = model.start_chat(history=history or [])
 
-        # Send initial message without streaming to check for tool calls
+        # First, check for tool calls with a non-streaming call
         initial_resp = chat.send_message(message)
 
         tool_traces = []
@@ -150,28 +150,20 @@ def run_agent_stream(message: str, history: list[Dict[str, Any]]):
                     )
                 )
 
-            # Get final response after tool calls and stream it
-            import time
-            final_resp = chat.send_message(tool_msgs)
-            if final_resp.text:
-                words = final_resp.text.split(' ')
-                for i, word in enumerate(words):
-                    if i > 0:
-                        yield {"type": "text", "content": " "}
-                    yield {"type": "text", "content": word}
-                    time.sleep(0.005)  # Small delay between words for streaming effect
+            # Stream the final response after tool calls using Gemini's streaming
+            stream_response = chat.send_message(tool_msgs, stream=True)
+            for chunk in stream_response:
+                if chunk.text:
+                    yield {"type": "text", "content": chunk.text}
         else:
-            # No tool calls, just stream the text
-            if initial_resp.text:
-                # Stream the text word by word for better effect
-                import time
-                text = initial_resp.text
-                words = text.split(' ')
-                for i, word in enumerate(words):
-                    if i > 0:
-                        yield {"type": "text", "content": " "}
-                    yield {"type": "text", "content": word}
-                    time.sleep(0.005)  # Small delay between words for streaming effect
+            # No tool calls, restart chat and stream the response directly
+            # We need to restart because we already consumed the response
+            chat = model.start_chat(history=history or [])
+            stream_response = chat.send_message(message, stream=True)
+
+            for chunk in stream_response:
+                if chunk.text:
+                    yield {"type": "text", "content": chunk.text}
 
         # Send final traces if any
         if tool_traces:

@@ -135,33 +135,42 @@ docker run -d -p 6379:6379 redis:7-alpine
 ai-travel-assistant/
 ├── backend/
 │   ├── app.py                 # Flask application entry point
-│   ├── gemini_agent.py        # Gemini AI integration
+│   ├── gemini_agent.py        # Gemini AI integration with streaming
+│   ├── agent_loop.py          # Agent loop system with ChooseToolResult
 │   ├── security.py            # Security and rate limiting
 │   ├── cache.py               # Redis caching utilities
 │   ├── schemas.py             # Pydantic schemas
 │   ├── tools/                 # Tool integrations
-│   │   ├── weather.py         # Weather API integration
-│   │   ├── currency.py        # Currency conversion
-│   │   ├── wikipedia.py       # Wikipedia search
+│   │   ├── __init__.py        # Tools module init
+│   │   ├── weather.py         # Weather API integration (Open-Meteo)
+│   │   ├── currency.py        # Currency conversion (ExchangeRate API)
+│   │   ├── wikipedia.py       # Wikipedia search integration
 │   │   └── utils.py           # Utility functions
 │   ├── requirements.txt       # Python dependencies
-│   └── Dockerfile
+│   └── Dockerfile             # Backend container configuration
 ├── frontend/
 │   ├── src/
 │   │   ├── app/              # Next.js app router
-│   │   │   ├── layout.tsx    # Root layout
+│   │   │   ├── layout.tsx    # Root layout with dark mode
 │   │   │   ├── page.tsx      # Home page
-│   │   │   └── globals.css   # Global styles
-│   │   └── components/       # React components
-│   │       └── ChatInterface.tsx  # Main chat UI
+│   │   │   └── globals.css   # Global styles with Tailwind
+│   │   ├── components/       # React components
+│   │   │   └── ChatInterface.tsx  # Main chat UI with Lottie animations
+│   │   └── lottie/           # Lottie animation files
+│   │       ├── plane.json    # Animated plane icon
+│   │       ├── rpa.json      # Bot avatar animation
+│   │       └── user.json     # User avatar animation
 │   ├── lib/
-│   │   └── utils.ts          # Utility functions
+│   │   └── utils.ts          # Utility functions (cn helper)
 │   ├── package.json          # Node dependencies
-│   ├── tailwind.config.js    # Tailwind configuration
+│   ├── tailwind.config.js    # Tailwind CSS configuration
 │   ├── postcss.config.js     # PostCSS configuration
-│   └── Dockerfile
+│   ├── next.config.ts        # Next.js configuration
+│   └── Dockerfile             # Frontend container configuration
 ├── docker-compose.yml        # Docker orchestration
-└── .env                      # Environment variables
+├── .env                      # Environment variables (create from .env.example)
+├── .env.example              # Example environment variables
+└── README.md                 # Project documentation
 ```
 
 ## API Endpoints
@@ -169,10 +178,40 @@ ai-travel-assistant/
 ### Backend Endpoints
 
 - `GET /healthz` - Health check
-- `POST /chat` - Main chat endpoint (SSE streaming)
+- `POST /chat` - Main chat endpoint (SSE streaming with agent loop)
 - `POST /tools/weather` - Direct weather API
 - `POST /tools/convert` - Direct currency conversion
 
+## Agent Loop System
+
+The AI Travel Assistant uses an intelligent agent loop system that:
+
+### How It Works
+1. **ChooseToolResult**: Analyzes the user query and decides which tool to call next
+2. **Tool Execution**: Executes the chosen tool (weather, currency, wikipedia)
+3. **Context Accumulation**: Builds up a comprehensive context with all results
+4. **Loop Continue/Stop**: Repeats until all necessary information is gathered
+5. **Synthesis**: Creates a natural response from the accumulated context
+
+### Example Flow
+User: "What's the weather in Paris and how much is 100 EUR in USD?"
+
+```
+1. Agent analyzes query → Decides to call weather tool
+2. Calls weather(Paris) → Gets temperature, conditions
+3. Analyzes remaining needs → Decides to call currency tool
+4. Calls currency(100, EUR, USD) → Gets conversion rate
+5. All info gathered → Calls STOP
+6. Synthesizes natural response with all information
+```
+
+### Benefits
+- **Intelligent Orchestration**: Automatically determines which tools to use
+- **Complete Context**: Gathers all information before responding
+- **Reasoning Trace**: Each tool call includes why it was needed
+- **No Redundancy**: Avoids unnecessary repeated tool calls
+
+## Troubleshooting
 
 ### Common Issues
 

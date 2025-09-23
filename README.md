@@ -2,13 +2,14 @@
 
 An intelligent travel companion powered by Google's Gemini AI that provides real-time weather updates, currency conversion, and comprehensive travel information through a beautiful, modern interface.
 
-## Features 
+## Features
 
-- **Weather Information**: Get current weather conditions for any city worldwide
+- **Weather Information**: Get current weather conditions for any city worldwide with location disambiguation
 - **Currency Conversion**: Real-time currency exchange rates for travel budgeting
 - **Wikipedia Integration**: Access comprehensive information about destinations, attractions, and cultural insights
+- **Agent Loop System**: Intelligent multi-step reasoning that orchestrates tools automatically
 - **Smart Context**: AI remembers conversation context for personalized assistance
-- **Real-time Streaming**: See AI responses as they're generated
+- **Real-time Streaming**: See AI responses as they're generated with animated Lottie icons
 
 ## Tech Stack 
 
@@ -185,5 +186,4 @@ ai-travel-assistant/
 3. **Port already in use**:
    - Change ports in docker-compose.yml
    - Or stop conflicting services
-
 

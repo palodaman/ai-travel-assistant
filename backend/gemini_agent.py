@@ -1,10 +1,8 @@
 import os
 import google.generativeai as genai
 from typing import Dict, Any
-from tools.weather import get_weather
-from tools.currency import convert
-from tools.wikipedia import search_wikipedia
 from dotenv import load_dotenv
+from agent_loop import run_agent_loop
 
 # Suppress gRPC ALTS warning for local development
 os.environ['GRPC_VERBOSITY'] = 'ERROR'
@@ -117,131 +115,102 @@ Always aim to be helpful and provide practical, actionable information for trave
 
 
 def run_agent(message: str, history: list[Dict[str, Any]]):
-    # history is a list of {role: "user"|"model", parts: [...]}, optional
-    chat = model.start_chat(history=history or [])
-    resp = chat.send_message(message)
+    """
+    Main agent function using the agent loop system.
+    First gathers context through multiple tool calls, then synthesizes the final answer.
+    """
+    try:
+        # Create a separate model instance for the agent loop
+        loop_model = genai.GenerativeModel(
+            model_name=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+            system_instruction="You are a tool orchestration agent. Analyze queries and decide which tools to call."
+        )
 
-    tool_traces = []
-    # Loop until no more tool calls
-    MAX_STEPS = 4
-    for _ in range(MAX_STEPS):
-        calls = []
-        for part in resp.candidates[0].content.parts:
-            if fn := getattr(part, "function_call", None):
-                calls.append(fn)
+        # Step 1: Run the agent loop to gather context
+        agent_context = run_agent_loop(message, loop_model)
 
-        if not calls:
-            break
+        # Step 2: Use the main model to synthesize a final answer from the context
+        chat = model.start_chat(history=history or [])
 
-        tool_msgs = []
-        for call in calls:
-            name = call.name
-            args = dict(call.args)
+        synthesis_prompt = f"""Based on the following context gathered from various tools, provide a comprehensive and helpful answer to the user.
 
-            if name == "weather_tool":
-                out = get_weather(
-                    args["city"],
-                    state=args.get("state"),
-                    country=args.get("country")
-                )
-            elif name == "currency_convert":
-                out = convert(args["amount"], args["from"], args["to"])
-            elif name == "wikipedia_search":
-                out = search_wikipedia(
-                    args["query"],
-                    sentences=args.get("sentences", 3)
-                )
-            else:
-                out = {"error": f"Unknown tool {name}"}
+User Query: {message}
 
-            tool_traces.append({"name": name, "args": args, "result": out})
+Gathered Context:
+{agent_context}
 
-            tool_msgs.append(
-                genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name=name,
-                        response={"content": out}
-                    )
-                )
-            )
+Please synthesize this information into a clear, conversational response that directly answers the user's question.
+Include relevant details from the tools but present them in a natural, helpful way.
+Be concise but informative."""
 
-        # feed tool responses back
-        resp = chat.send_message(tool_msgs)
+        final_response = chat.send_message(synthesis_prompt)
 
-    final_text = resp.text or "No response."
-    return final_text, tool_traces
+        # Extract traces from agent context for display
+        traces = []
+        if "Weather function was called" in agent_context:
+            traces.append({"name": "weather_tool", "args": {}, "result": {}})
+        if "Currency function was called" in agent_context:
+            traces.append({"name": "currency_convert", "args": {}, "result": {}})
+        if "Wikipedia function was called" in agent_context:
+            traces.append({"name": "wikipedia_search", "args": {}, "result": {}})
+
+        return final_response.text or "No response.", traces
+
+    except Exception as e:
+        return f"Error in agent loop: {str(e)}", []
 
 
 def run_agent_stream(message: str, history: list[Dict[str, Any]]):
-    """Stream version of run_agent that yields chunks of text using real Gemini streaming"""
+    """Stream version using the agent loop system with real Gemini streaming"""
     try:
+        # Create a separate model instance for the agent loop
+        loop_model = genai.GenerativeModel(
+            model_name=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+            system_instruction="You are a tool orchestration agent. Analyze queries and decide which tools to call."
+        )
+
+        # Notify frontend that we're gathering context
+        yield {"type": "text", "content": "Gathering information"}
+
+        # Step 1: Run the agent loop to gather context
+        agent_context = run_agent_loop(message, loop_model)
+
+        # Extract tool traces for frontend display
+        tool_traces = []
+        if "Weather function was called" in agent_context:
+            tool_traces.append({"name": "weather_tool", "args": {}, "result": {}})
+            yield {"type": "tool_complete", "name": "weather_tool", "result": {}}
+        if "Currency function was called" in agent_context:
+            tool_traces.append({"name": "currency_convert", "args": {}, "result": {}})
+            yield {"type": "tool_complete", "name": "currency_convert", "result": {}}
+        if "Wikipedia function was called" in agent_context:
+            tool_traces.append({"name": "wikipedia_search", "args": {}, "result": {}})
+            yield {"type": "tool_complete", "name": "wikipedia_search", "result": {}}
+
+        # Clear the gathering message
+        yield {"type": "text", "content": "...\n\n"}
+
+        # Step 2: Stream the synthesized response
         chat = model.start_chat(history=history or [])
 
-        # First, check for tool calls with a non-streaming call
-        initial_resp = chat.send_message(message)
+        synthesis_prompt = f"""Based on the following context gathered from various tools, provide a comprehensive and helpful answer to the user.
 
-        tool_traces = []
-        calls = []
+User Query: {message}
 
-        # Check if there are function calls
-        for part in initial_resp.candidates[0].content.parts:
-            if fn := getattr(part, "function_call", None):
-                calls.append(fn)
+Gathered Context:
+{agent_context}
 
-        # If there are tool calls, process them
-        if calls:
-            tool_msgs = []
-            for call in calls:
-                name = call.name
-                args = dict(call.args)
+Please synthesize this information into a clear, conversational response that directly answers the user's question.
+Include relevant details from the tools but present them in a natural, helpful way.
+Be concise but informative."""
 
-                # Notify frontend about tool usage
-                yield {"type": "tool_start", "name": name, "args": args}
+        # Stream the final response
+        stream_response = chat.send_message(synthesis_prompt, stream=True)
+        for chunk in stream_response:
+            if chunk.text:
+                yield {"type": "text", "content": chunk.text}
 
-                if name == "weather_tool":
-                    out = get_weather(
-                        args["city"],
-                        state=args.get("state"),
-                        country=args.get("country")
-                    )
-                elif name == "currency_convert":
-                    out = convert(args["amount"], args["from"], args["to"])
-                elif name == "wikipedia_search":
-                    out = search_wikipedia(
-                        args["query"],
-                        sentences=args.get("sentences", 3)
-                    )
-                else:
-                    out = {"error": f"Unknown tool {name}"}
-
-                tool_traces.append({"name": name, "args": args, "result": out})
-                yield {"type": "tool_complete", "name": name, "result": out}
-
-                tool_msgs.append(
-                    genai.protos.Part(
-                        function_response=genai.protos.FunctionResponse(
-                            name=name,
-                            response={"content": out}
-                        )
-                    )
-                )
-
-            # Stream the final response after tool calls using Gemini's streaming
-            stream_response = chat.send_message(tool_msgs, stream=True)
-            for chunk in stream_response:
-                if chunk.text:
-                    yield {"type": "text", "content": chunk.text}
-        else:
-            # No tool calls, restart chat and stream the response directly
-            # We need to restart because we already consumed the response
-            chat = model.start_chat(history=history or [])
-            stream_response = chat.send_message(message, stream=True)
-
-            for chunk in stream_response:
-                if chunk.text:
-                    yield {"type": "text", "content": chunk.text}
-
-        # Send final traces if any
+        # Send final traces
         if tool_traces:
             yield {"type": "traces", "traces": tool_traces}
 

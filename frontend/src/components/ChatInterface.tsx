@@ -13,17 +13,22 @@ import {
   Globe,
   Loader2,
   TrendingUp,
-  Calendar,
   Info
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+
+interface ToolTrace {
+  name: string;
+  args: Record<string, unknown>;
+  result: Record<string, unknown>;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  traces?: any[];
+  traces?: ToolTrace[];
   isStreaming?: boolean;
 }
 
@@ -111,7 +116,7 @@ export default function ChatInterface() {
       }
 
       let buffer = "";
-      const traces: any[] = [];
+      const traces: ToolTrace[] = [];
 
       while (true) {
         const { done, value } = await reader.read();

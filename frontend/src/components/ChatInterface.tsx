@@ -3,12 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Send,
-  Plane,
   MapPin,
   DollarSign,
   Cloud,
-  Bot,
-  User,
   Sparkles,
   Globe,
   Loader2,
@@ -16,6 +13,10 @@ import {
   Info
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import Lottie from "lottie-react";
+import planeAnimation from "../lottie/plane.json";
+import botAnimation from "../lottie/rpa.json";
+import userAnimation from "../lottie/user.json";
 
 interface ToolTrace {
   name: string;
@@ -233,9 +234,14 @@ export default function ChatInterface() {
       <div className="border-b border-slate-800/50 backdrop-blur-sm bg-slate-900/50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className="relative w-12 h-12">
               <div className="absolute inset-0 bg-indigo-500/20 blur-xl"></div>
-              <Plane className="w-8 h-8 text-indigo-400 relative animate-pulse" />
+              <Lottie
+                animationData={planeAnimation}
+                loop={true}
+                autoplay={true}
+                className="w-12 h-12 relative"
+              />
             </div>
             <div>
               <h1 className="text-xl font-semibold text-slate-100">AI Travel Assistant</h1>
@@ -283,8 +289,13 @@ export default function ChatInterface() {
               )}
             >
               {message.role === "assistant" && (
-                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                  <Bot className="w-5 h-5 text-white" />
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-500/30">
+                  <Lottie
+                    animationData={botAnimation}
+                    loop={true}
+                    autoplay={true}
+                    className="w-8 h-8"
+                  />
                 </div>
               )}
 
@@ -327,8 +338,13 @@ export default function ChatInterface() {
               </div>
 
               {message.role === "user" && (
-                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center border border-slate-600/50">
-                  <User className="w-5 h-5 text-slate-300" />
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700/50 to-slate-800/50 flex items-center justify-center border border-slate-600/50">
+                  <Lottie
+                    animationData={userAnimation}
+                    loop={true}
+                    autoplay={true}
+                    className="w-7 h-7"
+                  />
                 </div>
               )}
             </div>
@@ -336,8 +352,13 @@ export default function ChatInterface() {
 
           {isLoading && streamingMessageId && (
             <div className="flex gap-3 justify-start animate-slide-up">
-              <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center animate-pulse">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-500/30">
+                <Lottie
+                  animationData={botAnimation}
+                  loop={true}
+                  autoplay={true}
+                  className="w-8 h-8"
+                />
               </div>
               <div className="px-4 py-3 rounded-2xl bg-slate-800/50 border border-slate-700/50">
                 <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />

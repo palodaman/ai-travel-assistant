@@ -103,7 +103,8 @@ export default function ChatInterface() {
     setStreamingMessageId(assistantMessageId);
 
     try {
-      const response = await fetch("http://localhost:5001/chat", {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+      const response = await fetch(`${backendUrl}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

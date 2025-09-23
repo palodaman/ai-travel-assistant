@@ -1,4 +1,10 @@
 services:
+  nginx:
+    build: ./backend/nginx
+    ports: ["8080:80"]
+    depends_on: [backend]
+    networks:
+      - app-network
   backend:
     build: ./backend
     environment:
@@ -15,16 +21,26 @@ services:
     volumes:
       - ./backend:/app
     command: python app.py
+    networks:
+      - app-network
   frontend:
     build: ./frontend
     environment:
-      NEXT_PUBLIC_BACKEND_URL: http://localhost:5001
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8080
     ports: ["3000:3000"]
     depends_on: [backend]
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    networks:
+      - app-network
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

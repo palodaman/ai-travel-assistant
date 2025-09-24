@@ -41,19 +41,19 @@ class AgentLoop:
 
 Available tools:
 1. weather - Get weather for a city
-   Format: {{"tool": "weather", "city": "string", "state": "optional", "country": "optional", "reason": "why this is needed"}}
+   Format: {{"tool": "weather", "city": "string", "state": "optional", "country": "optional", "reason": "your actual thinking about why you need this"}}
 
 2. currency - Convert currency amounts
-   Format: {{"tool": "currency", "amount": number, "from": "currency_code", "to": "currency_code", "reason": "why this is needed"}}
+   Format: {{"tool": "currency", "amount": number, "from": "currency_code", "to": "currency_code", "reason": "your actual thinking about why you need this"}}
 
 3. wikipedia - Search for information about places, people, or topics
-   Format: {{"tool": "wikipedia", "query": "search_term", "sentences": 3, "reason": "why this is needed"}}
+   Format: {{"tool": "wikipedia", "query": "search_term", "sentences": 3, "reason": "your actual thinking about why you need this"}}
 
 4. get_context - Return current accumulated context
    Format: {{"tool": "get_context"}}
 
 5. stop - Stop and return accumulated context
-   Format: {{"tool": "stop", "stop": true}}
+   Format: {{"tool": "stop", "stop": true, "reason": "explain what you've gathered and why you're ready to respond"}}
 
 User Query: {user_query}
 
@@ -63,11 +63,14 @@ Current Context Accumulated:
 Based on the user query and what has already been gathered in the context, decide what tool to call next.
 If all necessary information has been gathered, call the stop tool.
 
-Think step by step:
-1. What information does the user need?
-2. What have we already gathered?
-3. What's still missing?
-4. What tool should be called next?
+IMPORTANT: The "reason" field should contain your actual thinking process, like:
+- "I need to check the current weather conditions in Paris to help them plan their trip"
+- "Converting their budget from USD to EUR will help them understand local costs"
+- "Looking up information about the Louvre Museum since they asked about attractions"
+- "I now have the weather forecast and currency rates they requested, ready to provide a complete answer"
+
+Be genuine and specific about WHY you're making each tool call based on what the user actually asked.
+Don't use generic phrases like "User requested X" - explain your actual reasoning.
 
 Return ONLY valid JSON for the next tool call. No other text."""
 
@@ -106,7 +109,7 @@ Return ONLY valid JSON for the next tool call. No other text."""
                 city = tool_decision.get("city", "")
                 state = tool_decision.get("state")
                 country = tool_decision.get("country")
-                reason = tool_decision.get("reason", "User requested weather information")
+                reason = tool_decision.get("reason", "Checking weather conditions")
 
                 result = get_weather(city, state=state, country=country)
 
@@ -125,7 +128,7 @@ Return ONLY valid JSON for the next tool call. No other text."""
                 amount = tool_decision.get("amount", 1)
                 from_currency = tool_decision.get("from", "USD")
                 to_currency = tool_decision.get("to", "EUR")
-                reason = tool_decision.get("reason", "User requested currency conversion")
+                reason = tool_decision.get("reason", "Converting currency")
 
                 result = convert_currency(amount, from_currency, to_currency)
 
@@ -142,7 +145,7 @@ Return ONLY valid JSON for the next tool call. No other text."""
             elif tool_name == "wikipedia":
                 query = tool_decision.get("query", "")
                 sentences = tool_decision.get("sentences", 3)
-                reason = tool_decision.get("reason", "User requested information")
+                reason = tool_decision.get("reason", "Searching for information")
 
                 result = search_wikipedia(query, sentences=sentences)
 

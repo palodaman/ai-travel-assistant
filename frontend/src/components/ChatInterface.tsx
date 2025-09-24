@@ -358,15 +358,14 @@ export default function ChatInterface() {
                           <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-slate-600" />
                           <div>
                             <span className="text-slate-300">
-                              {step.tool === "stop" ? "Finalizing response" :
-                               step.tool === "weather" ? "Checking weather" :
-                               step.tool === "currency" ? "Converting currency" :
-                               step.tool === "wikipedia" ? "Searching information" :
-                               `Using ${step.tool}`}
+                              {step.reason || (
+                                step.tool === "stop" ? "Finalizing response" :
+                                step.tool === "weather" ? "Checking weather" :
+                                step.tool === "currency" ? "Converting currency" :
+                                step.tool === "wikipedia" ? "Searching information" :
+                                `Using ${step.tool}`
+                              )}
                             </span>
-                            {step.reason && (
-                              <span className="ml-1 text-slate-500">- {step.reason}</span>
-                            )}
                           </div>
                         </div>
                       ))}

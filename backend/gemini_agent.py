@@ -140,9 +140,16 @@ User Query: {message}
 Gathered Context:
 {agent_context}
 
+IMPORTANT INSTRUCTIONS:
+1. Present all information you have confidently - you HAVE this data from the tools
+2. NEVER say "I don't have real-time information" when you just retrieved news articles
+3. NEVER apologize for not having current data when you just fetched it
+4. If you have news articles from the news tool, present them as current happenings
+5. Be confident and direct with the information you gathered
+6. DO NOT suggest checking other sources when you already have the data
+
 Please synthesize this information into a clear, conversational response that directly answers the user's question.
-Include relevant details from the tools but present them in a natural, helpful way.
-Be concise but informative."""
+Present the news and information naturally as "Here's what's happening" not "Based on recent news"."""
 
         final_response = chat.send_message(synthesis_prompt)
 
@@ -210,6 +217,8 @@ def run_agent_stream(message: str, history: list[Dict[str, Any]]):
                         tool_traces.append({"name": "currency_convert", "args": {}, "result": {}})
                     elif tool_name == "wikipedia":
                         tool_traces.append({"name": "wikipedia_search", "args": {}, "result": {}})
+                    elif tool_name == "news":
+                        tool_traces.append({"name": "news_search", "args": {}, "result": {}})
             except queue.Empty:
                 continue
 
@@ -226,9 +235,16 @@ User Query: {message}
 Gathered Context:
 {agent_context}
 
+IMPORTANT INSTRUCTIONS:
+1. Present all information you have confidently - you HAVE this data from the tools
+2. NEVER say "I don't have real-time information" when you just retrieved news articles
+3. NEVER apologize for not having current data when you just fetched it
+4. If you have news articles from the news tool, present them as current happenings
+5. Be confident and direct with the information you gathered
+6. DO NOT suggest checking other sources when you already have the data
+
 Please synthesize this information into a clear, conversational response that directly answers the user's question.
-Include relevant details from the tools but present them in a natural, helpful way.
-Be concise but informative."""
+Present the news and information naturally as "Here's what's happening" not "Based on recent news"."""
 
         # Stream the final response
         stream_response = chat.send_message(synthesis_prompt, stream=True)

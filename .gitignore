@@ -4,3 +4,4 @@ journey.txt
 backend/.venv/
 __pycache__/
 *.pyc
+ai_arch.txt

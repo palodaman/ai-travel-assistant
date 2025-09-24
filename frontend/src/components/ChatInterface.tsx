@@ -243,6 +243,8 @@ export default function ChatInterface() {
         return <DollarSign className="w-4 h-4" />;
       case "wikipedia_search":
         return <Globe className="w-4 h-4" />;
+      case "news_search":
+        return <Info className="w-4 h-4" />;
       default:
         return <Info className="w-4 h-4" />;
     }
@@ -252,7 +254,7 @@ export default function ChatInterface() {
     "What's the weather in Paris?",
     "Convert 1000 USD to EUR",
     "Tell me about the Eiffel Tower",
-    "How much will $2000 last me in Japan?"
+    "What's happening in Tokyo right now?"
   ];
 
   // Show loading state while mounting to prevent hydration issues
@@ -363,6 +365,7 @@ export default function ChatInterface() {
                                 step.tool === "weather" ? "Checking weather" :
                                 step.tool === "currency" ? "Converting currency" :
                                 step.tool === "wikipedia" ? "Searching information" :
+                                step.tool === "news" ? "Finding news articles" :
                                 `Using ${step.tool}`
                               )}
                             </span>

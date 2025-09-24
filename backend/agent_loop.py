@@ -11,6 +11,7 @@ import google.generativeai as genai
 from tools.weather import get_weather
 from tools.currency import convert as convert_currency
 from tools.wikipedia import search_wikipedia
+from tools.news import get_news
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,10 +50,14 @@ Available tools:
 3. wikipedia - Search for information about places, people, or topics
    Format: {{"tool": "wikipedia", "query": "search_term", "sentences": 3, "reason": "your actual thinking about why you need this"}}
 
-4. get_context - Return current accumulated context
+4. news - Get recent news, current events, and happenings about a location
+   Format: {{"tool": "news", "query": "topic like events, tourism, attractions, happenings", "location": "city name", "num_articles": 3, "reason": "your actual thinking about why you need this"}}
+   ALWAYS USE THIS when users ask about: what's happening, latest news, current events, recent developments, what's going on, activities, or ANY questions about current/recent happenings in a city
+
+5. get_context - Return current accumulated context
    Format: {{"tool": "get_context"}}
 
-5. stop - Stop and return accumulated context
+6. stop - Stop and return accumulated context
    Format: {{"tool": "stop", "stop": true, "reason": "explain what you've gathered and why you're ready to respond"}}
 
 User Query: {user_query}
@@ -67,7 +72,16 @@ IMPORTANT: The "reason" field should contain your actual thinking process, like:
 - "I need to check the current weather conditions in Paris to help them plan their trip"
 - "Converting their budget from USD to EUR will help them understand local costs"
 - "Looking up information about the Louvre Museum since they asked about attractions"
+- "They're asking about latest happenings in London, I need to get current news and events"
+- "User wants to know what's going on in Bali, searching for recent news and activities"
 - "I now have the weather forecast and currency rates they requested, ready to provide a complete answer"
+
+KEY PHRASES that require the news tool:
+- "latest happenings" → use news tool
+- "what's happening" → use news tool
+- "current events" → use news tool
+- "what's going on" → use news tool
+- "recent news" → use news tool
 
 Be genuine and specific about WHY you're making each tool call based on what the user actually asked.
 Don't use generic phrases like "User requested X" - explain your actual reasoning.
@@ -154,6 +168,35 @@ Return ONLY valid JSON for the next tool call. No other text."""
                 output += f"  Title: {result.get('title', 'N/A')}\n"
                 output += f"  Summary: {result.get('summary', 'No summary available')}\n"
                 output += f"  URL: {result.get('url', 'N/A')}\n"
+                if result.get('error'):
+                    output += f"  Error: {result['error']}\n"
+                output += f"  REASON: {reason}\n"
+
+                return output
+
+            elif tool_name == "news":
+                query = tool_decision.get("query", "travel tourism events")
+                location = tool_decision.get("location", "")
+                num_articles = tool_decision.get("num_articles", 3)
+                reason = tool_decision.get("reason", "Searching for news")
+
+                result = get_news(query, location=location, num_articles=num_articles)
+
+                output = f"\n+ News function was called at {timestamp} and generated this output:\n"
+                output += f"  Query: {query} in {location}\n"
+                output += f"  Found: {result.get('total_results', 0)} articles\n"
+
+                if result.get('articles'):
+                    output += "  Top Articles:\n"
+                    for i, article in enumerate(result['articles'][:3], 1):
+                        output += f"    {i}. {article.get('title', 'N/A')}\n"
+                        output += f"       Source: {article.get('source', 'Unknown')}\n"
+                        if article.get('description'):
+                            desc = article['description'][:150] + '...' if len(article.get('description', '')) > 150 else article['description']
+                            output += f"       {desc}\n"
+                else:
+                    output += "  No articles found\n"
+
                 if result.get('error'):
                     output += f"  Error: {result['error']}\n"
                 output += f"  REASON: {reason}\n"
